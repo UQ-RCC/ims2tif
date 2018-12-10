@@ -1,0 +1,35 @@
+cmake_minimum_required(VERSION 3.10)
+project(ims2tif-winharness)
+
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/modules")
+
+if(MSVC)
+	set(CompilerFlags
+		CMAKE_CXX_FLAGS
+		CMAKE_CXX_FLAGS_DEBUG
+		CMAKE_CXX_FLAGS_RELEASE
+		CMAKE_CXX_FLAGS_RELWITHDEBINFO
+		CMAKE_CXX_FLAGS_MINSIZEREL
+		CMAKE_C_FLAGS
+		CMAKE_C_FLAGS_DEBUG
+		CMAKE_C_FLAGS_RELEASE
+		CMAKE_C_FLAGS_RELWITHDEBINFO
+		CMAKE_C_FLAGS_MINSIZEREL
+	)
+
+	foreach(CompilerFlag ${CompilerFlags})
+		string(REPLACE "/MD" "/MT" ${CompilerFlag} "${${CompilerFlag}}")
+	endforeach()
+endif()
+
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(zlib OFF CACHE BOOL "" FORCE)
+set(MDI_SUPPORT OFF CACHE BOOL "" FORCE)
+add_subdirectory(tiff-4.0.9)
+
+set(HDF5_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+add_subdirectory(hdf5-1.10.4)
+
+set(HDF5_USE_STATIC_LIBRARIES ON CACHE BOOL "" FORCE)
+add_subdirectory(ims2tif)

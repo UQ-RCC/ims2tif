@@ -1,0 +1,2 @@
+set(HDF5_LIBRARIES hdf5-static)
+set(HDF5_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/hdf5-1.10.4/src" "${CMAKE_BINARY_DIR}/hdf5-1.10.4")
