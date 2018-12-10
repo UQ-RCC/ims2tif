@@ -90,6 +90,8 @@ static struct timespec parse_timestamp(const char *s)
 	) != 7)
 		throw std::range_error("invalid timestamp");
 
+	tm.tm_year -= 1900;
+
 	struct timespec ts;
 	ts.tv_sec = mktime(&tm);
 	ts.tv_nsec = msec * 1000000;
