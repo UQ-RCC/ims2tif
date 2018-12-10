@@ -86,13 +86,13 @@ int ims::parse_arguments(int argc, char **argv, FILE *out, FILE *err, args_t *ar
 			case ARGDEF_PREFIX:
 				if(!args->prefix.empty())
 					return usage(2, out);
-				args->prefix = ps.optarg;
+				args->prefix = std::string(ps.optarg);
 				break;
 
 			case ARGDEF_METHOD:
 				if(!args->method.empty())
 					return usage(2, out);
-				args->method = ps.optarg;
+				args->method = std::string(ps.optarg);
 				break;
 
 			case 1:
