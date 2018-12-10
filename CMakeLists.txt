@@ -28,4 +28,7 @@ set_property(TARGET ims2tif PROPERTY CXX_STANDARD_REQUIRED ON)
 target_include_directories(ims2tif PRIVATE ${HDF5_INCLUDE_DIRS})
 target_link_libraries(ims2tif PRIVATE ${HDF5_LIBRARIES})
 target_link_libraries(ims2tif PRIVATE TIFF::TIFF)
-target_link_libraries(ims2tif PRIVATE stdc++fs)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+	target_link_libraries(ims2tif PRIVATE stdc++fs)
+endif()

@@ -27,7 +27,7 @@ SOFTWARE.
 */
 
 #include "ims2tif.hpp"
-
+#include <array>
 #include <tiffio.h>
 
 using namespace ims;

@@ -211,7 +211,7 @@ static size_t get_num_digits(size_t num)
 	return c;
 }
 
-static std::vector<fs::path> build_output_paths(const char *prefix, const char *outdir, size_t nfiles)
+static std::vector<fs::path> build_output_paths(const char *prefix, const fs::path& outdir, size_t nfiles)
 {
 	std::vector<fs::path> paths(nfiles);
 
@@ -222,10 +222,32 @@ static std::vector<fs::path> build_output_paths(const char *prefix, const char *
 	{
 		ss.str("");
 		ss << prefix << std::right << std::setfill('0') << std::setw(ndigits) << i << ".tif";
-		paths[i] = out / ss.str();
+		paths[i] = out / fs::u8path(ss.str());
 	}
 
 	return paths;
+}
+
+/*
+ * Hack around Windows being "special" and HDF5 not playing nice.
+ * On the systems we're using there'll never be non-ascii characters, so this will work.
+ */
+hid_t xH5Fopen(const fs::path& path, unsigned flags, hid_t access_plist)
+{
+#if defined(_WIN32)
+	return H5Fopen(path.u8string().c_str(), flags, access_plist);
+#else
+	return H5Fopen(path.c_str(), flags, access_plist);
+#endif
+}
+
+TIFF *xTIFFOpen(const fs::path& path, const char *m)
+{
+#if defined(_WIN32)
+	return TIFFOpenW(path.c_str(), m);
+#else
+	return TIFFOpen(path.c_str(), m);
+#endif
 }
 
 int main(int argc, char **argv)
@@ -249,7 +271,7 @@ int main(int argc, char **argv)
 		return 2;
 	}
 
-	h5f_ptr file(H5Fopen(args.file.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT));
+	h5f_ptr file(xH5Fopen(args.file, H5F_ACC_RDONLY, H5P_DEFAULT));
 	if(!file)
 		return 1;
 
@@ -267,13 +289,12 @@ int main(int argc, char **argv)
 	if(!rlevel)
 		return 1;
 
-	std::vector<fs::path> paths = build_output_paths(args.prefix.c_str(), args.outdir.c_str(), imsinfo.time_points.size());
+	std::vector<fs::path> paths = build_output_paths(args.prefix.c_str(), args.outdir, imsinfo.time_points.size());
 
 	for(size_t i = 0; i < imsinfo.time_points.size(); ++i)
 	{
 		/* Open the tif */
-		tiff_ptr tif(TIFFOpen(paths[i].c_str(), "w"));
-
+		tiff_ptr tif(xTIFFOpen(paths[i].c_str(), "w"));
 		tiff_writer tiffw(tif.get(), imsinfo.z_size);
 		tiffw.set_thumbnail_rgba8888(thumb.get(), thumb_size);
 

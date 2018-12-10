@@ -116,7 +116,7 @@ int ims::parse_arguments(int argc, char **argv, FILE *out, FILE *err, args_t *ar
 
 	if(args->prefix.empty())
 	{
-		args->prefix = args->file.stem();
+		args->prefix = args->file.stem().u8string();
 		args->prefix.append("_");
 	}
 
