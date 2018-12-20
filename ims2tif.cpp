@@ -291,6 +291,14 @@ int main(int argc, char **argv)
 	if(!rlevel)
 		return 1;
 
+	/* Create the output directory if it doesn't exist. */
+	std::error_code ec;
+	if(!fs::create_directories(args.outdir, ec) || ec)
+	{
+		fprintf(stderr, "Error creating output directory: %s\n", ec.message().c_str());
+		return 1;
+	}
+
 	std::vector<fs::path> paths = build_output_paths(args.prefix.c_str(), args.outdir, imsinfo.time_points.size());
 
 	for(size_t i = 0; i < imsinfo.time_points.size(); ++i)
