@@ -128,42 +128,23 @@ struct args_t
 /* args.cpp */
 int parse_arguments(int argc, char **argv, FILE *out, FILE *err, args_t *args);
 
-class tiff_writer
-{
-public:
-	tiff_writer() = delete;
-	tiff_writer(const tiff_writer&) = delete;
-	tiff_writer(tiff_writer&&) = default;
-
-	tiff_writer& operator=(const tiff_writer&) = delete;
-	tiff_writer& operator=(tiff_writer&&) = default;
-
-	tiff_writer(TIFF *tif, size_t max_pages);
-
-	void write_page_contig(size_t w, size_t h, size_t num_channels, uint16_t *data);
-private:
-	TIFF *m_tif;
-	size_t m_max_pages;
-	size_t m_current_page;
-};
-
 std::string read_attribute(hid_t id, const char *name);
 
 size_t read_uint_attribute(hid_t id, const char *name);
 
+void tiff_write_page_contig(TIFF *tiff, size_t w, size_t h, size_t num_channels, size_t page, size_t maxPage, uint16_t *data);
 
 
-
-using convert_proc = void(*)(tiff_writer& tiff, hid_t timepoint, size_t xs, size_t ys, size_t zs, size_t nchan);
+using convert_proc = void(*)(TIFF *tiff, hid_t timepoint, size_t xs, size_t ys, size_t zs, size_t nchan, size_t page, size_t maxPage);
 
 /* cvt_bigload.cpp */
-void converter_bigload(tiff_writer& tiff, hid_t timepoint, size_t xs, size_t ys, size_t zs, size_t nchan);
+void converter_bigload(TIFF *tiff, hid_t timepoint, size_t xs, size_t ys, size_t zs, size_t nchan, size_t page, size_t maxPage);
 
 /* cvt_chunk.cpp */
-void converter_chunk(tiff_writer& tiff, hid_t timepoint, size_t xs, size_t ys, size_t zs, size_t nchan);
+void converter_chunk(TIFF *tiff, hid_t timepoint, size_t xs, size_t ys, size_t zs, size_t nchan, size_t page, size_t maxPage);
 
 /* cvt_hyperslab.cpp */
-void converter_hyperslab(tiff_writer& tiff, hid_t timepoint, size_t xs, size_t ys, size_t zs, size_t nchan);
+void converter_hyperslab(TIFF *tiff, hid_t timepoint, size_t xs, size_t ys, size_t zs, size_t nchan, size_t page, size_t maxPage);
 
 }
 

@@ -194,7 +194,6 @@ int main(int argc, char **argv)
 	{
 		/* Open the tif */
 		tiff_ptr tif(xTIFFOpen(paths[i].c_str(), "w"));
-		tiff_writer tiffw(tif.get(), imsinfo.z);
 
 		/* Get the timepoint */
 		char tpbuf[32];
@@ -203,7 +202,7 @@ int main(int argc, char **argv)
 		if(!tp)
 			return 1;
 
-		conv(tiffw, tp.get(), imsinfo.x, imsinfo.y, imsinfo.z, imsinfo.c);
+		conv(tif.get(), tp.get(), imsinfo.x, imsinfo.y, imsinfo.z, imsinfo.c, i + 1, imsinfo.t);
 	}
 
 	return 0;

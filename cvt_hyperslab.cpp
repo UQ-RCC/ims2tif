@@ -71,7 +71,7 @@ static int chan_read_hyperslab(hid_t tp, size_t channel, uint16_t *data, size_t 
 	return 0;
 }
 
-void ims::converter_hyperslab(tiff_writer& tiff, hid_t timepoint, size_t xs, size_t ys, size_t zs, size_t nchan)
+void ims::converter_hyperslab(TIFF *tiff, hid_t timepoint, size_t xs, size_t ys, size_t zs, size_t nchan, size_t page, size_t maxPage)
 {
 	std::unique_ptr<uint16_t[]> buffer = std::make_unique<uint16_t[]>(xs * ys * nchan);
 
@@ -83,6 +83,6 @@ void ims::converter_hyperslab(tiff_writer& tiff, hid_t timepoint, size_t xs, siz
 				throw hdf5_exception();
 		}
 
-		tiff.write_page_contig(xs, ys, nchan, buffer.get());
+		tiff_write_page_contig(tiff, xs, ys, nchan, page, maxPage, buffer.get());
 	}
 }

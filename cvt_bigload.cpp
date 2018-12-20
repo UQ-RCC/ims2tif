@@ -100,7 +100,7 @@ static void planar_to_contig(uint16_t *planar, size_t xs, size_t ys, size_t zs, 
 	}
 }
 
-void ims::converter_bigload(tiff_writer& tiff, hid_t timepoint, size_t xs, size_t ys, size_t zs, size_t nchan)
+void ims::converter_bigload(TIFF *tiff, hid_t timepoint, size_t xs, size_t ys, size_t zs, size_t nchan, size_t page, size_t maxPage)
 {
 	const size_t chansize = xs * ys * zs;
 	const size_t bufsize = xs * ys * zs * nchan;
@@ -127,6 +127,6 @@ void ims::converter_bigload(tiff_writer& tiff, hid_t timepoint, size_t xs, size_
 	for(size_t z = 0; z < zs; ++z)
 	{
 		uint16_t *imgstart = contigbuf + (z * (xs * ys * nchan));
-		tiff.write_page_contig(xs, ys, nchan, imgstart);
+		tiff_write_page_contig(tiff, xs, ys, nchan, page, maxPage, imgstart);
 	}
 }

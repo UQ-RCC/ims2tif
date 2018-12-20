@@ -13,7 +13,6 @@ add_executable(ims2tif
 	args.cpp
 	ims.cpp
 
-	tiff.cpp
 	cvt_hyperslab.cpp
 	cvt_bigload.cpp
 	cvt_chunk.cpp
