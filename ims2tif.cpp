@@ -44,12 +44,11 @@ void ims::tiff_deleter::operator()(pointer t) noexcept { TIFFClose(t); }
 
 struct ims_info_t
 {
-	size_t channel_count;
-	size_t x_size;
-	size_t y_size;
-	size_t z_size;
-
-	std::vector<struct timespec> time_points;
+	size_t x;
+	size_t y;
+	size_t z;
+	size_t c;
+	size_t t;
 };
 
 static ims_info_t read_image_info(hid_t file)
@@ -58,59 +57,42 @@ static ims_info_t read_image_info(hid_t file)
 
 	ims_info_t imsinfo;
 	h5g_ptr dsi(H5Gopen(file, "DataSetInfo", H5P_DEFAULT));
+	if(!dsi)
+		throw hdf5_exception();
 
 	{
 		h5g_ptr image(H5Gopen2(dsi.get(), "Image", H5P_DEFAULT));
-		imsinfo.x_size = read_uint_attribute(image.get(), "X");
-		imsinfo.y_size = read_uint_attribute(image.get(), "Y");
-		imsinfo.z_size = read_uint_attribute(image.get(), "Z");
+		if(!image)
+			throw hdf5_exception();
+
+		imsinfo.x = read_uint_attribute(image.get(), "X");
+		imsinfo.y = read_uint_attribute(image.get(), "Y");
+		imsinfo.z = read_uint_attribute(image.get(), "Z");
 	}
 
 	{
-		/* Is a struct in case I need any other info in the future. */
-		struct it_data
-		{
-			size_t count;
-		} tmp = {
-			0
-		};
-
-		/* Count the number of channels by counting the number of "Channel %u" groups. */
-		H5Literate(dsi.get(), H5_INDEX_NAME, H5_ITER_NATIVE, nullptr,[](hid_t id, const char *name, const H5L_info_t *info, void *data) {
-			it_data *it = reinterpret_cast<it_data*>(data);
+		/*
+		** Count the number of channels by counting the number of "Channel %u" groups.
+		** Some files have a "CustomData/NumberOfChannels" attribute, but I can't rely on this.
+		*/
+		imsinfo.c = 0;
+		H5Literate(dsi.get(), H5_INDEX_NAME, H5_ITER_NATIVE, nullptr, [](hid_t id, const char *name, const H5L_info_t *info, void *data) {
+			ims_info_t *ims = reinterpret_cast<ims_info_t*>(data);
 
 			uint32_t c;
 			if(sscanf(name, "Channel %u\n", &c) == 1)
-				++it->count;
+				++ims->c;
 
 			return 0;
-		}, &tmp);
-
-		imsinfo.channel_count = tmp.count;
+		}, &imsinfo);
 	}
 
-	/* Not all files have this unfortunately. */
-#if 0
-	{
-		h5g_ptr cd(H5Gopen2(dsi.get(), "CustomData", H5P_DEFAULT));
-		imsinfo.channel_count = read_uint_attribute(cd.get(), "NumberOfChannels");
-	}
-#endif
 	{
 		h5g_ptr ti(H5Gopen2(dsi.get(), "TimeInfo", H5P_DEFAULT));
-		size_t num_time_points = read_uint_attribute(ti.get(), "FileTimePoints");
+		if(!ti)
+			throw hdf5_exception();
 
-		imsinfo.time_points.reserve(num_time_points);
-		for(uint32_t i = 0; i < num_time_points; ++i)
-		{
-			char tpbuf[32]; /* Enough for "TimePoint%u" */
-			sprintf(tpbuf, "TimePoint%u", i + 1);
-			std::string ts = read_attribute(ti.get(), tpbuf);
-			std::optional<struct timespec> ts2 = parse_timestamp(ts.c_str());
-			if(!ts2)
-				throw std::runtime_error("invalid timestamp");
-			imsinfo.time_points.push_back(ts2.value());
-		}
+		imsinfo.t = read_uint_attribute(ti.get(), "FileTimePoints");
 	}
 
 	return imsinfo;
@@ -210,13 +192,13 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	std::vector<fs::path> paths = build_output_paths(args.prefix.c_str(), args.outdir, imsinfo.time_points.size());
+	std::vector<fs::path> paths = build_output_paths(args.prefix.c_str(), args.outdir, imsinfo.t);
 
-	for(size_t i = 0; i < imsinfo.time_points.size(); ++i)
+	for(size_t i = 0; i < imsinfo.t; ++i)
 	{
 		/* Open the tif */
 		tiff_ptr tif(xTIFFOpen(paths[i].c_str(), "w"));
-		tiff_writer tiffw(tif.get(), imsinfo.z_size);
+		tiff_writer tiffw(tif.get(), imsinfo.z);
 		tiffw.set_thumbnail_rgba8888(thumb.get(), thumb_size);
 
 		/* Get the timepoint */
@@ -226,7 +208,7 @@ int main(int argc, char **argv)
 		if(!tp)
 			return 1;
 
-		conv(tiffw, tp.get(), imsinfo.x_size, imsinfo.y_size, imsinfo.z_size, imsinfo.channel_count);
+		conv(tiffw, tp.get(), imsinfo.x, imsinfo.y, imsinfo.z, imsinfo.c);
 	}
 
 	return 0;
