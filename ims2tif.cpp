@@ -182,7 +182,8 @@ int main(int argc, char **argv)
 
 	/* Create the output directory if it doesn't exist. */
 	std::error_code ec;
-	if(!fs::create_directories(args.outdir, ec) || ec)
+	fs::create_directories(args.outdir, ec);
+	if(ec)
 	{
 		fprintf(stderr, "Error creating output directory: %s\n", ec.message().c_str());
 		return 1;
