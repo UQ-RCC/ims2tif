@@ -1,37 +1,6 @@
 #include <cstring>
 #include "ims2tif.hpp"
 
-std::unique_ptr<uint8_t[]> ims::read_thumbnail(hid_t fid, size_t& size)
-{
-	h5g_ptr thmb(H5Gopen2(fid, "Thumbnail", H5P_DEFAULT));
-	if(!thmb)
-		return nullptr;
-
-	h5d_ptr d(H5Dopen2(thmb.get(), "Data", H5P_DEFAULT));
-	if(!d)
-		return nullptr;
-
-	h5s_ptr s(H5Dget_space(d.get()));
-
-	int ndims = H5Sget_simple_extent_ndims(s.get());
-	if(ndims != 2)
-		return nullptr;
-
-	hsize_t dims[2];
-	H5Sget_simple_extent_dims(s.get(), dims, nullptr);
-
-	/* 512x2048 = 512 * RGBA8888 */
-	if(dims[1] != 4 * dims[0])
-		return nullptr;
-
-	std::unique_ptr<uint8_t[]> data = std::make_unique<uint8_t[]>(dims[0] * dims[1]);
-	if(H5Dread(d.get(), H5T_NATIVE_UCHAR, H5S_ALL, H5S_ALL, H5P_DEFAULT, data.get()) < 0)
-		return nullptr;
-
-	size = dims[0];
-	return data;
-}
-
 std::string ims::read_attribute(hid_t id, const char *name)
 {
 	h5a_ptr att(H5Aopen_by_name(id, ".", name, H5P_DEFAULT, H5P_DEFAULT));

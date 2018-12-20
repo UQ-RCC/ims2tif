@@ -141,20 +141,11 @@ public:
 	tiff_writer(TIFF *tif, size_t max_pages);
 
 	void write_page_contig(size_t w, size_t h, size_t num_channels, uint16_t *data);
-	void set_thumbnail_rgba8888(uint8_t *p, size_t size);
 private:
 	TIFF *m_tif;
 	size_t m_max_pages;
-
-	uint8_t *m_thumb;
-	size_t m_thumb_size;
 	size_t m_current_page;
 };
-
-
-
-/* Read a square RGBA8888 thumbnail. */
-std::unique_ptr<uint8_t[]> read_thumbnail(hid_t fid, size_t& size);
 
 std::string read_attribute(hid_t id, const char *name);
 

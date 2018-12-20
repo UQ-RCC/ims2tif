@@ -170,11 +170,7 @@ int main(int argc, char **argv)
 	if(!file)
 		return 1;
 
-	/* The format of these files doesn't follow the spec. Everything below is from inspecting the files manually. */
 	ims_info_t imsinfo = read_image_info(file.get());
-
-	size_t thumb_size = 0;
-	std::unique_ptr<uint8_t[]> thumb = read_thumbnail(file.get(), thumb_size);
 
 	h5g_ptr ds(H5Gopen2(file.get(), "DataSet", H5P_DEFAULT));
 	if(!ds)
@@ -199,7 +195,6 @@ int main(int argc, char **argv)
 		/* Open the tif */
 		tiff_ptr tif(xTIFFOpen(paths[i].c_str(), "w"));
 		tiff_writer tiffw(tif.get(), imsinfo.z);
-		tiffw.set_thumbnail_rgba8888(thumb.get(), thumb_size);
 
 		/* Get the timepoint */
 		char tpbuf[32];
