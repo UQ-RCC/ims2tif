@@ -32,34 +32,6 @@ std::unique_ptr<uint8_t[]> ims::read_thumbnail(hid_t fid, size_t& size)
 	return data;
 }
 
-std::optional<struct timespec> ims::parse_timestamp(const char *s) noexcept
-{
-	/*
-	 * Timestamps are of the format: 2018-05-24 10:38:17.794
-	 * FIXME: What do I do about timezones?
-	 */
-	struct tm tm;
-	uint32_t msec;
-	memset(&tm, 0, sizeof(tm));
-	if(sscanf(s, "%4u-%2u-%2u %2u:%2u:%2u.%3u",
-		&tm.tm_year, &tm.tm_mon, &tm.tm_mday,
-		&tm.tm_hour, &tm.tm_min, &tm.tm_sec,
-		&msec
-	) != 7)
-		return std::optional<struct timespec>();
-
-	tm.tm_year -= 1900;
-
-	struct timespec ts;
-	ts.tv_sec = mktime(&tm);
-	ts.tv_nsec = msec * 1000000;
-
-	if(ts.tv_sec == static_cast<time_t>(-1))
-		return std::optional<struct timespec>();
-
-	return ts;
-}
-
 std::string ims::read_attribute(hid_t id, const char *name)
 {
 	h5a_ptr att(H5Aopen_by_name(id, ".", name, H5P_DEFAULT, H5P_DEFAULT));

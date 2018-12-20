@@ -156,8 +156,6 @@ private:
 /* Read a square RGBA8888 thumbnail. */
 std::unique_ptr<uint8_t[]> read_thumbnail(hid_t fid, size_t& size);
 
-std::optional<struct timespec> parse_timestamp(const char *s) noexcept;
-
 std::string read_attribute(hid_t id, const char *name);
 
 size_t read_uint_attribute(hid_t id, const char *name);
