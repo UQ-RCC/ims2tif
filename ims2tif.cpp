@@ -42,66 +42,6 @@ using namespace ims;
 
 void ims::tiff_deleter::operator()(pointer t) noexcept { TIFFClose(t); }
 
-static std::string read_attribute(hid_t id, const char *name)
-{
-	h5a_ptr att(H5Aopen_by_name(id, ".", name, H5P_DEFAULT, H5P_DEFAULT));
-	if(!att)
-		throw hdf5_exception();
-
-	h5s_ptr attsize(H5Aget_space(att.get()));
-	if(!attsize)
-		throw hdf5_exception();
-
-	hsize_t size;
-	if(H5Sget_simple_extent_dims(attsize.get(), &size, nullptr) < 0)
-		throw hdf5_exception();
-
-	std::string s(size, '\0');
-	if(H5Aread(att.get(), H5T_C_S1, &s[0]) < 0)
-		throw hdf5_exception();
-
-	return s;
-}
-
-static size_t read_uint_attribute(hid_t id, const char *name)
-{
-	std::string s = read_attribute(id, name);
-
-	size_t v;
-	if(sscanf(s.c_str(), "%zu", &v) != 1)
-		;
-
-	return v;
-}
-
-static struct timespec parse_timestamp(const char *s)
-{
-	/*
-	 * Timestamps are of the format: 2018-05-24 10:38:17.794
-	 * FIXME: What do I do about timezones?
-	 */
-	struct tm tm;
-	uint32_t msec;
-	memset(&tm, 0, sizeof(tm));
-	if(sscanf(s, "%4u-%2u-%2u %2u:%2u:%2u.%3u",
-		&tm.tm_year, &tm.tm_mon, &tm.tm_mday,
-		&tm.tm_hour, &tm.tm_min, &tm.tm_sec,
-		&msec
-	) != 7)
-		throw std::range_error("invalid timestamp");
-
-	tm.tm_year -= 1900;
-
-	struct timespec ts;
-	ts.tv_sec = mktime(&tm);
-	ts.tv_nsec = msec * 1000000;
-
-	if(ts.tv_sec == static_cast<time_t>(-1))
-		throw std::range_error("invalid timestamp");
-
-	return ts;
-}
-
 struct ims_info_t
 {
 	size_t channel_count;
@@ -166,43 +106,14 @@ static ims_info_t read_image_info(hid_t file)
 			char tpbuf[32]; /* Enough for "TimePoint%u" */
 			sprintf(tpbuf, "TimePoint%u", i + 1);
 			std::string ts = read_attribute(ti.get(), tpbuf);
-			imsinfo.time_points.push_back(parse_timestamp(ts.c_str()));
+			std::optional<struct timespec> ts2 = parse_timestamp(ts.c_str());
+			if(!ts2)
+				throw std::runtime_error("invalid timestamp");
+			imsinfo.time_points.push_back(ts2.value());
 		}
 	}
 
 	return imsinfo;
-}
-
-/* Read a square RGBA8888 thumbnail. */
-static std::unique_ptr<uint8_t[]> read_thumbnail(hid_t fid, size_t& size)
-{
-	h5g_ptr thmb(H5Gopen2(fid, "Thumbnail", H5P_DEFAULT));
-	if(!thmb)
-		return nullptr;
-
-	h5d_ptr d(H5Dopen2(thmb.get(), "Data", H5P_DEFAULT));
-	if(!d)
-		return nullptr;
-
-	h5s_ptr s(H5Dget_space(d.get()));
-
-	int ndims = H5Sget_simple_extent_ndims(s.get());
-	if(ndims != 2)
-		return nullptr;
-
-	hsize_t dims[2];
-	H5Sget_simple_extent_dims(s.get(), dims, nullptr);
-
-	/* 512x2048 = 512 * RGBA8888 */
-	if(dims[1] != 4 * dims[0])
-		return nullptr;
-
-	std::unique_ptr<uint8_t[]> data = std::make_unique<uint8_t[]>(dims[0] * dims[1]);
-	if(H5Dread(d.get(), H5T_NATIVE_UCHAR, H5S_ALL, H5S_ALL, H5P_DEFAULT, data.get()) < 0)
-		return nullptr;
-
-	size = dims[0];
-	return data;
 }
 
 static size_t get_num_digits(size_t num)

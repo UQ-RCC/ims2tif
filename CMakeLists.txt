@@ -11,6 +11,7 @@ add_executable(ims2tif
 	ims2tif.cpp
 	ims2tif.hpp
 	args.cpp
+	ims.cpp
 
 	tiff.cpp
 	cvt_hyperslab.cpp

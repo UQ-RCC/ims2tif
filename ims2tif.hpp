@@ -34,6 +34,7 @@ SOFTWARE.
 #include <vector>
 #include <iosfwd>
 #include <filesystem>
+#include <optional>
 #include "hdf5.h"
 
 using TIFF = struct tiff;
@@ -149,6 +150,20 @@ private:
 	size_t m_thumb_size;
 	size_t m_current_page;
 };
+
+
+
+/* Read a square RGBA8888 thumbnail. */
+std::unique_ptr<uint8_t[]> read_thumbnail(hid_t fid, size_t& size);
+
+std::optional<struct timespec> parse_timestamp(const char *s) noexcept;
+
+std::string read_attribute(hid_t id, const char *name);
+
+size_t read_uint_attribute(hid_t id, const char *name);
+
+
+
 
 using convert_proc = void(*)(tiff_writer& tiff, hid_t timepoint, size_t xs, size_t ys, size_t zs, size_t nchan);
 
