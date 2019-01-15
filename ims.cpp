@@ -29,7 +29,7 @@ size_t ims::read_uint_attribute(hid_t id, const char *name)
 
 	size_t v;
 	if(sscanf(s.c_str(), "%zu", &v) != 1)
-		;
+		throw hdf5_exception();
 
 	return v;
 }
