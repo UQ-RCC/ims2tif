@@ -4,7 +4,7 @@ Converts Imaris files (IMS) from the Andor Dragonfly into TIFF stacks for use wi
 
 ## Usage
 ```
-Usage: ./ims2tif [OPTIONS] <file.ims> 
+Usage: ./ims2tif [OPTIONS] <file.ims>
 Options:
   -h, --help
                           Display this message.
@@ -17,6 +17,9 @@ Options:
   -m, --method
                           The conversion method to use. If unspecified, use "chunked".
                           Available methods are "bigload", "chunked", and "hyperslab".
+  -f, --format
+                          The output file format. If unspecified, use "bigtiff".
+                          Available formats are "tiff", "bigtiff".
 ```
 
 ### Methods

@@ -120,10 +120,13 @@ using tiff_ptr = std::unique_ptr<tiff_deleter::pointer, tiff_deleter>;
 
 struct args_t
 {
+	args_t() noexcept;
+
 	std::filesystem::path file;
 	std::string prefix;
 	std::filesystem::path outdir;
 	std::string method;
+	bool bigtiff;
 };
 /* args.cpp */
 int parse_arguments(int argc, char **argv, FILE *out, FILE *err, args_t *args);

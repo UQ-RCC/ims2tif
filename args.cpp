@@ -34,12 +34,14 @@ SOFTWARE.
 #define ARGDEF_OUTDIR	'o'
 #define ARGDEF_PREFIX	'p'
 #define ARGDEF_METHOD	'm'
+#define ARGDEF_FORMAT	'f'
 #define ARGDEF_HELP		'h'
 
 static struct parg_option argdefs[] = {
 	{"outdir",  PARG_REQARG,    nullptr,	ARGDEF_OUTDIR},
 	{"prefix",  PARG_REQARG,    nullptr,	ARGDEF_PREFIX},
 	{"method",  PARG_REQARG,    nullptr,	ARGDEF_METHOD},
+	{"format",  PARG_REQARG,    nullptr,	ARGDEF_FORMAT},
 	{"help",	PARG_NOARG,		nullptr,	ARGDEF_HELP},
 	{nullptr,	0,			    nullptr,	0}
 };
@@ -56,21 +58,26 @@ static const char *USAGE_OPTIONS =
 "  -m, --method\n"
 "                          The conversion method to use. If unspecified, use \"chunked\".\n"
 "                          Available methods are \"bigload\", \"chunked\", and \"hyperslab\".\n"
+"  -f, --format\n"
+"                          The output file format. If unspecified, use \"bigtiff\".\n"
+"                          Available formats are \"tiff\", \"bigtiff\".\n"
 "";
+
+ims::args_t::args_t() noexcept :
+	bigtiff(true)
+{}
 
 int ims::parse_arguments(int argc, char **argv, FILE *out, FILE *err, args_t *args)
 {
 	parg_state ps;
 	parg_init(&ps);
 
-	memset(args, 0, sizeof(args_t));
-
 	auto usage = [&argv](int val, FILE *s){
 		fprintf(s, "Usage: %s [OPTIONS] <file.ims> \nOptions:\n%s", argv[0], USAGE_OPTIONS);
 		return val;
 	};
 
-	for(int c; (c = parg_getopt_long(&ps, argc, argv, "ho:p:m:", argdefs, nullptr)) != -1; )
+	for(int c; (c = parg_getopt_long(&ps, argc, argv, "ho:p:m:f:", argdefs, nullptr)) != -1; )
 	{
 		switch(c)
 		{
@@ -93,6 +100,15 @@ int ims::parse_arguments(int argc, char **argv, FILE *out, FILE *err, args_t *ar
 				if(!args->method.empty())
 					return usage(2, out);
 				args->method = std::string(ps.optarg);
+				break;
+
+			case ARGDEF_FORMAT:
+				if(!strcmp(ps.optarg, "tiff"))
+					args->bigtiff = false;
+				else if(!strcmp(ps.optarg, "bigtiff"))
+					args->bigtiff = true;
+				else
+					return usage(2, out);
 				break;
 
 			case 1:

@@ -194,7 +194,7 @@ int main(int argc, char **argv)
 	for(size_t i = 0; i < imsinfo.t; ++i)
 	{
 		/* Open the tif */
-		tiff_ptr tif(xTIFFOpen(paths[i].c_str(), "w8"));
+		tiff_ptr tif(xTIFFOpen(paths[i].c_str(), args.bigtiff ? "w8" : "w"));
 
 		/* Get the timepoint */
 		char tpbuf[32];
