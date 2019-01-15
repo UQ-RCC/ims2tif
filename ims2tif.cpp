@@ -112,12 +112,11 @@ static std::vector<fs::path> build_output_paths(const char *prefix, const fs::pa
 
 	size_t ndigits = get_num_digits(nfiles);
 	std::stringstream ss;
-	fs::path out(outdir);
 	for(size_t i = 0; i < nfiles; ++i)
 	{
 		ss.str("");
-		ss << prefix << std::right << std::setfill('0') << std::setw(ndigits) << i << ".tif";
-		paths[i] = out / fs::u8path(ss.str());
+		ss << prefix << std::right << std::setfill('0') << std::setw(static_cast<int>(ndigits)) << i << ".tif";
+		paths[i] = outdir / fs::u8path(ss.str());
 	}
 
 	return paths;
