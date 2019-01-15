@@ -1,4 +1,5 @@
 #include <cstring>
+#include <array>
 #include "ims2tif.hpp"
 
 std::string ims::read_attribute(hid_t id, const char *name)
