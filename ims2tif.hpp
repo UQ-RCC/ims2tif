@@ -118,6 +118,13 @@ struct tiff_deleter
 };
 using tiff_ptr = std::unique_ptr<tiff_deleter::pointer, tiff_deleter>;
 
+enum class conversion_method_t
+{
+	bigload,
+	chunked,
+	hyperslab
+};
+
 struct args_t
 {
 	args_t() noexcept;
@@ -125,7 +132,7 @@ struct args_t
 	std::filesystem::path file;
 	std::string prefix;
 	std::filesystem::path outdir;
-	std::string method;
+	conversion_method_t method;
 	bool bigtiff;
 };
 /* args.cpp */

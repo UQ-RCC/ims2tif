@@ -64,7 +64,8 @@ static const char *USAGE_OPTIONS =
 "";
 
 ims::args_t::args_t() noexcept :
-	bigtiff(true)
+	bigtiff(true),
+	method(conversion_method_t::chunked)
 {}
 
 int ims::parse_arguments(int argc, char **argv, FILE *out, FILE *err, args_t *args)
@@ -76,6 +77,9 @@ int ims::parse_arguments(int argc, char **argv, FILE *out, FILE *err, args_t *ar
 		fprintf(s, "Usage: %s [OPTIONS] <file.ims> \nOptions:\n%s", argv[0], USAGE_OPTIONS);
 		return val;
 	};
+
+	bool have_method = false;
+	bool have_format = false;
 
 	for(int c; (c = parg_getopt_long(&ps, argc, argv, "ho:p:m:f:", argdefs, nullptr)) != -1; )
 	{
@@ -97,18 +101,33 @@ int ims::parse_arguments(int argc, char **argv, FILE *out, FILE *err, args_t *ar
 				break;
 
 			case ARGDEF_METHOD:
-				if(!args->method.empty())
+				if(have_method)
 					return usage(2, out);
-				args->method = std::string(ps.optarg);
+
+				if(!strcmp(ps.optarg, "bigload"))
+					args->method = conversion_method_t::bigload;
+				else if(!strcmp(ps.optarg, "chunked"))
+					args->method = conversion_method_t::chunked;
+				else if(!strcmp(ps.optarg, "hyperslab"))
+					args->method = conversion_method_t::hyperslab;
+				else
+					return usage(2, out);
+
+				have_method = true;
 				break;
 
 			case ARGDEF_FORMAT:
+				if(have_format)
+					return usage(2, out);
+
 				if(!strcmp(ps.optarg, "tiff"))
 					args->bigtiff = false;
 				else if(!strcmp(ps.optarg, "bigtiff"))
 					args->bigtiff = true;
 				else
 					return usage(2, out);
+
+				have_format = true;
 				break;
 
 			case 1:
@@ -135,9 +154,6 @@ int ims::parse_arguments(int argc, char **argv, FILE *out, FILE *err, args_t *ar
 		args->prefix = args->file.stem().u8string();
 		args->prefix.append("_");
 	}
-
-	if(args->method.empty())
-		args->method = "chunked";
 
 	return 0;
 }

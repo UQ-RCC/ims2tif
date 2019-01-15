@@ -152,18 +152,14 @@ int main(int argc, char **argv)
 		return aret;
 
 	convert_proc conv = nullptr;
-	if(args.method == "bigload")
+	if(args.method == conversion_method_t::bigload)
 		conv = converter_bigload;
-	else if(args.method == "chunked")
+	else if(args.method == conversion_method_t::chunked)
 		conv = converter_chunk;
-	else if(args.method == "hyperslab")
+	else if(args.method == conversion_method_t::hyperslab)
 		conv = converter_hyperslab;
-
-	if(conv == nullptr)
-	{
-		fprintf(stderr, "Unknown conversion method %s.\n", args.method.c_str());
-		return 2;
-	}
+	else
+		std::terminate(); /* Will never happen. */
 
 	h5f_ptr file(xH5Fopen(args.file, H5F_ACC_RDONLY, H5P_DEFAULT));
 	if(!file)
