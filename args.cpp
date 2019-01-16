@@ -56,7 +56,7 @@ static const char *USAGE_OPTIONS =
 "                          The prefix of the output file. If unspecified,\n"
 "                          use the base name of the input file plus a trailing _.\n"
 "  -m, --method\n"
-"                          The conversion method to use. If unspecified, use \"chunked\".\n"
+"                          The conversion method to use. If unspecified, use \"bigload\".\n"
 "                          Available methods are \"bigload\", \"chunked\", and \"hyperslab\".\n"
 "  -f, --format\n"
 "                          The output file format. If unspecified, use \"bigtiff\".\n"
@@ -65,7 +65,7 @@ static const char *USAGE_OPTIONS =
 
 ims::args_t::args_t() noexcept :
 	bigtiff(true),
-	method(conversion_method_t::chunked)
+	method(conversion_method_t::bigload)
 {}
 
 int ims::parse_arguments(int argc, char **argv, FILE *out, FILE *err, args_t *args)
@@ -74,7 +74,7 @@ int ims::parse_arguments(int argc, char **argv, FILE *out, FILE *err, args_t *ar
 	parg_init(&ps);
 
 	auto usage = [&argv](int val, FILE *s){
-		fprintf(s, "Usage: %s [OPTIONS] <file.ims> \nOptions:\n%s", argv[0], USAGE_OPTIONS);
+		fprintf(s, "Usage: %s [OPTIONS] <file.ims>\nOptions:\n%s", argv[0], USAGE_OPTIONS);
 		return val;
 	};
 

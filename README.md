@@ -15,7 +15,7 @@ Options:
                           The prefix of the output file. If unspecified,
                           use the base name of the input file plus a trailing _.
   -m, --method
-                          The conversion method to use. If unspecified, use "chunked".
+                          The conversion method to use. If unspecified, use "bigload".
                           Available methods are "bigload", "chunked", and "hyperslab".
   -f, --format
                           The output file format. If unspecified, use "bigtiff".
