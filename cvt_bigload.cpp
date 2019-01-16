@@ -30,7 +30,7 @@ SOFTWARE.
 
 using namespace ims;
 
-static int chan_read_bigload(hid_t tp, size_t channel, uint16_t *data, size_t z, size_t xs, size_t ys, size_t zs, hsize_t nchan)
+static int chan_read_bigload(hid_t tp, size_t channel, uint16_t *data)
 {
 	char cbuf[32];
 	sprintf(cbuf, "Channel %zu", channel);
@@ -111,18 +111,15 @@ void ims::converter_bigload(TIFF *tiff, hid_t timepoint, size_t xs, size_t ys, s
 	uint16_t *imgbuf = buffer.get();
 	uint16_t *contigbuf = buffer.get() + bufsize;
 
-	for(size_t z = 0; z < zs; ++z)
+	/* Read the channel data. It's planar, so we have to read the entire timepoint. */
+	for(size_t c = 0; c < nchan; ++c)
 	{
-		/* Read the channel data. It's planar, so we have to read the entire timepoint. */
-		for(size_t c = 0; c < nchan; ++c)
-		{
-			uint16_t *chanstart = imgbuf + (chansize * c);
-			if(chan_read_bigload(timepoint, c, chanstart, z, xs, ys, zs, nchan) < 0)
-				throw hdf5_exception();
-		}
-
-		planar_to_contig(imgbuf, xs, ys, zs, nchan, contigbuf);
+		uint16_t *chanstart = imgbuf + (chansize * c);
+		if(chan_read_bigload(timepoint, c, chanstart) < 0)
+			throw hdf5_exception();
 	}
+
+	planar_to_contig(imgbuf, xs, ys, zs, nchan, contigbuf);
 
 	for(size_t z = 0; z < zs; ++z)
 	{
