@@ -75,36 +75,41 @@ Use crosstool-ng to build a GCC 8.1.0+ toolchain using musl. A configuration fil
 under `ctng-toolchain`.
 
 ```bash
+#!/bin/bash
+set -e
+
 export CC=/opt/x-tools/x86_64-pc-linux-musl/bin/x86_64-pc-linux-musl-gcc
 export CXX=/opt/x-tools/x86_64-pc-linux-musl/bin/x86_64-pc-linux-musl-g++
-export PREFIX=/home/zane/Desktop/springfield/ims2tif-static/prefix
+export PREFIX=/home/zane/Desktop/springfield/ims2tif-static2/prefix
 
 tar -xf tiff-4.0.9.tar.gz
 tar -xf hdf5-1.10.3.tar.gz
 
 mkdir -p tiff-build
 pushd tiff-build
-	../tiff-4.0.9/configure --prefix=$PREFIX --enable-shared=no
-	make # -j doesn't work
-	make install
+        ../tiff-4.0.9/configure --prefix=$PREFIX --enable-shared=no
+        make # -j doesn't work
+        make install
 popd
 
 mkdir -p hdf5-build
 pushd hdf5-build
-	../hdf5-1.10.3/configure --prefix=$PREFIX --enable-shared=no
-	make -j
-	make install
+        ../hdf5-1.10.3/configure --prefix=$PREFIX --enable-shared=no \
+                --enable-static-exec --disable-fortran --disable-hl \
+                --disable-cxx --disable-java
+        make -j
+        make install
 popd
 
 mkdir -p ims2tif-build
 pushd ims2tif-build
-	cmake \
-		-DCMAKE_INSTALL_PREFIX=$PREFIX \
-		-DHDF5_USE_STATIC_LIBRARIES=On \
-		-DHDF5_ROOT=$PREFIX \
-		-DCMAKE_EXE_LINKER_FLAGS="-static-libgcc -static-libstdc++ -static" \
-		../../ims2tif
-	make -j
+        cmake \
+                -DCMAKE_INSTALL_PREFIX=$PREFIX \
+                -DHDF5_USE_STATIC_LIBRARIES=On \
+                -DHDF5_ROOT=$PREFIX \
+                -DCMAKE_EXE_LINKER_FLAGS="-static-libgcc -static-libstdc++ -static" \
+                ../../ims2tif
+        make -j
     strip -s ims2tif
 popd
 ```
