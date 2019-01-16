@@ -65,9 +65,12 @@ static ims_info_t read_image_info(hid_t file)
 		if(!image)
 			throw hdf5_exception();
 
-		imsinfo.x = read_uint_attribute(image.get(), "X");
-		imsinfo.y = read_uint_attribute(image.get(), "Y");
-		imsinfo.z = read_uint_attribute(image.get(), "Z");
+		imsinfo.x = hdf5_read_uint_attribute(image.get(), "X").value_or(0);
+		imsinfo.y = hdf5_read_uint_attribute(image.get(), "Y").value_or(0);
+		imsinfo.z = hdf5_read_uint_attribute(image.get(), "Z").value_or(0);
+
+		if(imsinfo.x == 0 || imsinfo.y == 0 || imsinfo.z == 0)
+			throw hdf5_exception();
 	}
 
 	{
@@ -92,13 +95,15 @@ static ims_info_t read_image_info(hid_t file)
 		if(!ti)
 			throw hdf5_exception();
 
-		imsinfo.t = read_uint_attribute(ti.get(), "FileTimePoints");
+		imsinfo.t = hdf5_read_uint_attribute(ti.get(), "FileTimePoints").value_or(0);
+		if(imsinfo.t == 0)
+			throw hdf5_exception();
 	}
 
 	return imsinfo;
 }
 
-static size_t get_num_digits(size_t num)
+static size_t get_num_digits(size_t num) noexcept
 {
 	size_t c = 0;
 	for(; num > 0; ++c)
@@ -126,7 +131,7 @@ static std::vector<fs::path> build_output_paths(const char *prefix, const fs::pa
  * Hack around Windows being "special" and HDF5 not playing nice.
  * On the systems we're using there'll never be non-ascii characters, so this will work.
  */
-hid_t xH5Fopen(const fs::path& path, unsigned flags, hid_t access_plist)
+static hid_t xH5Fopen(const fs::path& path, unsigned flags, hid_t access_plist)
 {
 #if defined(_WIN32)
 	return H5Fopen(path.u8string().c_str(), flags, access_plist);
@@ -135,7 +140,7 @@ hid_t xH5Fopen(const fs::path& path, unsigned flags, hid_t access_plist)
 #endif
 }
 
-TIFF *xTIFFOpen(const fs::path& path, const char *m)
+static TIFF *xTIFFOpen(const fs::path& path, const char *m) noexcept
 {
 #if defined(_WIN32)
 	return TIFFOpenW(path.c_str(), m);

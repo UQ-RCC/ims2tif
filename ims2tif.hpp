@@ -118,12 +118,7 @@ struct tiff_deleter
 };
 using tiff_ptr = std::unique_ptr<tiff_deleter::pointer, tiff_deleter>;
 
-enum class conversion_method_t
-{
-	bigload,
-	chunked,
-	hyperslab
-};
+enum class conversion_method_t { bigload, chunked, hyperslab };
 
 struct args_t
 {
@@ -138,9 +133,9 @@ struct args_t
 /* args.cpp */
 int parse_arguments(int argc, char **argv, FILE *out, FILE *err, args_t *args);
 
-std::string read_attribute(hid_t id, const char *name);
+std::optional<std::string> hdf5_read_attribute(hid_t id, const char *name) noexcept;
 
-size_t read_uint_attribute(hid_t id, const char *name);
+std::optional<size_t> hdf5_read_uint_attribute(hid_t id, const char *name) noexcept;
 
 void tiff_write_page_contig(TIFF *tiff, size_t w, size_t h, size_t num_channels, size_t page, size_t maxPage, uint16_t *data);
 
