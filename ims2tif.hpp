@@ -137,8 +137,9 @@ std::optional<std::string> hdf5_read_attribute(hid_t id, const char *name) noexc
 
 std::optional<size_t> hdf5_read_uint_attribute(hid_t id, const char *name) noexcept;
 
-void tiff_write_page_contig(TIFF *tiff, size_t w, size_t h, size_t num_channels, size_t page, size_t maxPage, uint16_t *data);
+int read_channel(hid_t tp, size_t channel, uint16_t *data, size_t xs, size_t ys, size_t zs) noexcept;
 
+void tiff_write_page_contig(TIFF *tiff, size_t w, size_t h, size_t num_channels, size_t page, size_t maxPage, uint16_t *data);
 
 using convert_proc = void(*)(TIFF *tiff, hid_t timepoint, size_t xs, size_t ys, size_t zs, size_t nchan, size_t page, size_t maxPage);
 

@@ -30,24 +30,6 @@ SOFTWARE.
 
 using namespace ims;
 
-static int chan_read_bigload(hid_t tp, size_t channel, uint16_t *data)
-{
-	char cbuf[32];
-	sprintf(cbuf, "Channel %zu", channel);
-	h5g_ptr chan(H5Gopen2(tp, cbuf, H5P_DEFAULT));
-	if(!chan)
-		return -1;
-
-	h5d_ptr d(H5Dopen2(chan.get(), "Data", H5P_DEFAULT));
-	if(!d)
-		return -1;
-
-	if(H5Dread(d.get(), H5T_NATIVE_UINT16, H5S_ALL, H5S_ALL, H5P_DEFAULT, data) < 0)
-		return -1;
-
-	return 0;
-}
-
 /* Hard-coded RGB planar-to-contig. Handy for debugging the TIFF writing code. */
 static void planar_to_contig_3chan(uint16_t *planar, size_t xs, size_t ys, size_t zs, size_t num_channels, uint16_t *contig)
 {
@@ -115,7 +97,7 @@ void ims::converter_bigload(TIFF *tiff, hid_t timepoint, size_t xs, size_t ys, s
 	for(size_t c = 0; c < nchan; ++c)
 	{
 		uint16_t *chanstart = imgbuf + (chansize * c);
-		if(chan_read_bigload(timepoint, c, chanstart) < 0)
+		if(read_channel(timepoint, c, chanstart, xs, ys, zs) < 0)
 			throw hdf5_exception();
 	}
 

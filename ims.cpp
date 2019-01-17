@@ -37,6 +37,36 @@ std::optional<size_t> ims::hdf5_read_uint_attribute(hid_t id, const char *name) 
 	return v;
 }
 
+int ims::read_channel(hid_t tp, size_t channel, uint16_t *data, size_t xs, size_t ys, size_t zs) noexcept
+{
+	char cbuf[32];
+	sprintf(cbuf, "Channel %zu", channel);
+	h5g_ptr chan(H5Gopen2(tp, cbuf, H5P_DEFAULT));
+	if(!chan)
+		return -1;
+
+	h5d_ptr d(H5Dopen2(chan.get(), "Data", H5P_DEFAULT));
+	if(!d)
+		return -1;
+
+	h5s_ptr dataspace(H5Dget_space(d.get()));
+	if(!dataspace)
+		return -1;
+
+	/* Sometimes if the dataset isn't POT, it's padded up to the next POT. Account for this. */
+	hsize_t offset[3] = {0, 0, 0};
+	hsize_t count[3] = {zs, ys, xs};
+	hsize_t stride[3] = {1, 1, 1};
+	hsize_t blocksize[3] = {1, 1, 1};
+	if(H5Sselect_hyperslab(dataspace.get(), H5S_SELECT_SET, offset, stride, count, blocksize) < 0)
+		return -1;
+
+	if(H5Dread(d.get(), H5T_NATIVE_UINT16, H5S_ALL, dataspace.get(), H5P_DEFAULT, data) < 0)
+		return -1;
+
+	return 0;
+}
+
 void ims::tiff_write_page_contig(TIFF *tiff, size_t w, size_t h, size_t num_channels, size_t page, size_t maxPage, uint16_t *data)
 {
 	TIFFSetField(tiff, TIFFTAG_IMAGEWIDTH, static_cast<uint32_t>(w));
