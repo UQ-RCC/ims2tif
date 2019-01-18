@@ -118,7 +118,7 @@ struct tiff_deleter
 };
 using tiff_ptr = std::unique_ptr<tiff_deleter::pointer, tiff_deleter>;
 
-enum class conversion_method_t { bigload, chunked, hyperslab };
+enum class conversion_method_t { bigload, chunked, hyperslab, opencl };
 
 struct args_t
 {
@@ -151,6 +151,9 @@ void converter_chunk(TIFF *tiff, hid_t timepoint, size_t xs, size_t ys, size_t z
 
 /* cvt_hyperslab.cpp */
 void converter_hyperslab(TIFF *tiff, hid_t timepoint, size_t xs, size_t ys, size_t zs, size_t nchan, size_t page, size_t maxPage);
+
+/* cvt_opencl.cpp */
+void converter_opencl(TIFF *tiff, hid_t timepoint, size_t xs, size_t ys, size_t zs, size_t nchan, size_t page, size_t maxPage);
 
 }
 

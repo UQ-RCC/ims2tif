@@ -104,6 +104,8 @@ popd
 mkdir -p ims2tif-build
 pushd ims2tif-build
         cmake \
+                -DTIFF_LIBRARY=$PREFIX/lib/libtiff.a \
+                -DTIFF_INCLUDE_DIR=$PREFIX/include \
                 -DCMAKE_INSTALL_PREFIX=$PREFIX \
                 -DHDF5_USE_STATIC_LIBRARIES=On \
                 -DHDF5_ROOT=$PREFIX \

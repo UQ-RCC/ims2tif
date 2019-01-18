@@ -1,0 +1,305 @@
+#include <cassert>
+#include <type_traits>
+#include <CL/cl.h>
+#include "ims2tif.hpp"
+
+using namespace ims;
+
+struct cl_context_deleter
+{
+	using pointer = cl_context;
+	void operator()(pointer p) noexcept { clReleaseContext(p); }
+};
+using cl_context_ptr = std::unique_ptr<std::remove_pointer_t<cl_context>, cl_context_deleter>;
+
+struct cl_mem_deleter
+{
+	using pointer = cl_mem;
+	void operator()(pointer p) noexcept { clReleaseMemObject(p); }
+};
+using cl_mem_ptr = std::unique_ptr<std::remove_pointer_t<cl_mem>, cl_mem_deleter>;
+
+struct cl_command_queue_deleter
+{
+	using pointer = cl_command_queue;
+	void operator()(pointer p) noexcept { clReleaseCommandQueue(p); }
+};
+using cl_command_queue_ptr = std::unique_ptr<std::remove_pointer_t<cl_command_queue>, cl_command_queue_deleter>;
+
+struct cl_program_deleter
+{
+	using pointer = cl_program;
+	void operator()(pointer p) noexcept { clReleaseProgram(p); }
+};
+using cl_program_ptr = std::unique_ptr<std::remove_pointer_t<cl_program>, cl_program_deleter>;
+
+struct cl_kernel_deleter
+{
+	using pointer = cl_kernel;
+	void operator()(pointer p) noexcept { clReleaseKernel(p); }
+};
+using cl_kernel_ptr = std::unique_ptr<std::remove_pointer_t<cl_kernel>, cl_kernel_deleter>;
+
+static void CL_CALLBACK err_proc(const char *errinfo, const void *private_info, size_t cb, void *user)
+{
+	fprintf(stderr, "%s\n", errinfo);
+}
+
+struct clstate
+{
+	size_t xs, ys, zs;
+	size_t nchan;
+	hid_t timepoint;
+
+	cl_context_ptr  ctx;
+	cl_command_queue_ptr dev_queue;
+
+	constexpr static size_t max_channels = 5;
+	std::array<cl_mem_ptr, max_channels> channel_images;
+	std::array<std::unique_ptr<uint16_t[]>, max_channels> host_channel_buffers;
+	std::array<cl_event, max_channels> channel_events;
+
+	cl_mem_ptr output_buffer;
+	std::array<cl_event, max_channels> interleave_events;
+};
+
+static const char *kernel =
+"__kernel void interleave(__global unsigned short *contig, __read_only image3d_t chan, unsigned int c, unsigned int nchan)\n"
+"{\n"
+"	size_t x = get_global_id(0);\n"
+"	size_t y = get_global_id(1);\n"
+"	size_t z = get_global_id(2);\n"
+"\n"
+"	int4 dims = get_image_dim(chan);\n"
+"	const size_t pixsize = nchan;\n"
+"	const size_t rowsize = dims.x * pixsize;\n"
+"	const size_t slicesize = dims.y * rowsize;\n"
+"\n"
+"	global unsigned short *slice = contig + (z * slicesize);\n"
+"	global unsigned short *row = slice + (y * rowsize);\n"
+"	global unsigned short *pixel = row + (x * pixsize);\n"
+"\n"
+"	global unsigned short *out = pixel + c;\n"
+
+"	sampler_t sam = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_NONE | CLK_FILTER_NEAREST;\n"
+"	int4 pos = {x, y, z, 0};\n"
+"	unsigned int col = read_imageui(chan, pos).x;\n"
+"	*out = col;"
+"}\n";
+
+template <typename T>
+cl_int clSetKernelArg2(cl_kernel kern, cl_uint arg_index, T val)
+{
+	return clSetKernelArg(kern, arg_index, sizeof(T), &val);
+}
+
+#include <cstring>
+static cl_kernel_ptr build_kernel(cl_context ctx, cl_device_id dev, cl_int *err) noexcept
+{
+	*err = CL_SUCCESS;
+
+	size_t len = 0;
+	cl_program_ptr pg(clCreateProgramWithSource(ctx, 1, &kernel, &len, err));
+	if(!pg)
+		return nullptr;
+
+	if(clBuildProgram(pg.get(), 1, &dev, "-cl-std=CL1.2", nullptr, nullptr) != CL_SUCCESS)
+	{
+		char log[2048];
+		memset(log, 0, sizeof(log));
+		clGetProgramBuildInfo(pg.get(), dev, CL_PROGRAM_BUILD_LOG, sizeof(log) - 1, log, nullptr);
+		fprintf(stderr, "%s\n", log);
+		return nullptr;
+	}
+
+	cl_kernel_ptr kern(clCreateKernel(pg.get(), "interleave", err));
+	if(!kern)
+		return nullptr;
+
+	return kern;
+}
+
+static void fill_images(clstate& s)
+{
+	s.channel_events.fill(nullptr);
+
+	for(size_t c = 0; c < s.nchan; ++c)
+	{
+		if(read_channel(s.timepoint, c, s.host_channel_buffers[c].get(), s.xs, s.ys, s.zs) < 0)
+			throw hdf5_exception();
+		cl_int err;
+
+		size_t origin[] = {0, 0, 0};
+		size_t region[] = {s.xs, s.ys, s.zs};
+		err = clEnqueueWriteImage(
+			s.dev_queue.get(),
+			s.channel_images[c].get(),
+			CL_FALSE,
+			origin,
+			region,
+			0 /* s.xs * sizeof(uint16_t) */,
+			0 /* (s.xs * sizeof(uint16_t)) * s.ys */,
+			s.host_channel_buffers[c].get(),
+			0,
+			nullptr,
+			s.channel_events.data() + c
+		);
+		assert(err == CL_SUCCESS);
+	}
+}
+
+#define USE_OPENCL_1_2
+
+void ims::converter_opencl(TIFF *tiff, hid_t timepoint, size_t xs, size_t ys, size_t zs, size_t nchan, size_t page, size_t maxPage)
+{
+	cl_uint platformIdCount = 0;
+	clGetPlatformIDs(0, nullptr, &platformIdCount);
+
+	std::vector<cl_platform_id> platformIds(platformIdCount);
+	clGetPlatformIDs(platformIdCount, platformIds.data(), nullptr);
+
+	cl_uint deviceIdCount = 0;
+	clGetDeviceIDs(platformIds[0], CL_DEVICE_TYPE_ALL, 0, nullptr, &deviceIdCount);
+	std::vector<cl_device_id> deviceIds(deviceIdCount);
+	clGetDeviceIDs(platformIds[0], CL_DEVICE_TYPE_ALL, deviceIdCount, deviceIds.data(), nullptr);
+
+	const cl_context_properties contextProperties[] =
+	{
+		CL_CONTEXT_PLATFORM, reinterpret_cast<cl_context_properties> (platformIds[0]),
+		0, 0
+	};
+
+	cl_int error;
+
+	clstate state;
+	state.xs = xs;
+	state.ys = ys;
+	state.zs = zs;
+	state.nchan = nchan;
+	state.timepoint = timepoint;
+
+	state.ctx.reset(clCreateContext(contextProperties, deviceIdCount, deviceIds.data(), err_proc, nullptr, &error));
+	if(!state.ctx)
+		throw std::exception();
+
+#ifdef USE_OPENCL_1_2
+	/* Wiener only has OpenCL 1.2 */
+	state.dev_queue.reset(clCreateCommandQueue(state.ctx.get(), deviceIds[0], 0, &error));
+#else
+	const cl_queue_properties queueprops[] = {
+		CL_QUEUE_PROPERTIES, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE | CL_QUEUE_ON_DEVICE | CL_QUEUE_ON_DEVICE_DEFAULT,
+		CL_QUEUE_SIZE,  CL_DEVICE_QUEUE_ON_DEVICE_PREFERRED_SIZE,
+		0
+	};
+
+	state.dev_queue.reset(clCreateCommandQueueWithProperties(state.ctx.get(), deviceIds[0], nullptr, &error));
+#endif
+
+	assert(error == CL_SUCCESS);
+
+	cl_image_format chanfmt;
+	chanfmt.image_channel_order = CL_R;
+	chanfmt.image_channel_data_type = CL_UNSIGNED_INT16;
+
+	cl_image_desc chandesc;
+	chandesc.image_type = CL_MEM_OBJECT_IMAGE3D;
+	chandesc.image_width = xs;
+	chandesc.image_height = ys;
+	chandesc.image_depth = zs;
+	chandesc.image_array_size = 1;
+	chandesc.image_row_pitch = 0;
+	chandesc.image_slice_pitch = 0;
+	chandesc.num_mip_levels = 0;
+	chandesc.num_samples = 0;
+#ifdef USE_OPENCL_1_2
+	chandesc.buffer = nullptr;
+#else
+	chandesc.mem_object = nullptr;
+#endif
+
+	if(nchan > clstate::max_channels)
+		std::terminate();
+
+	/* Allocate an image-per-channel. */
+	for(size_t i = 0; i < nchan; ++i)
+	{
+		state.host_channel_buffers[i] = std::make_unique<uint16_t[]>(xs * ys * zs);
+		state.channel_images[i].reset(clCreateImage(
+			state.ctx.get(),
+			CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY,
+			&chanfmt,
+			&chandesc,
+			nullptr,
+			&error
+		));
+		assert(state.channel_images[i]);
+		assert(error == CL_SUCCESS);
+	}
+
+	state.output_buffer.reset(clCreateBuffer(
+		state.ctx.get(),
+		CL_MEM_WRITE_ONLY | CL_MEM_HOST_READ_ONLY,
+		xs * ys * zs * sizeof(uint16_t) * nchan,
+		nullptr,
+		&error
+	));
+	assert(state.output_buffer);
+	assert(error == CL_SUCCESS);
+
+	cl_kernel_ptr kern = build_kernel(state.ctx.get(), deviceIds[0], &error);
+	assert(kern);
+
+	state.interleave_events.fill(nullptr);
+	fill_images(state);
+
+	//clWaitForEvents((cl_uint)nchan, state.channel_events.data());
+
+	size_t global_work_size[3] = {state.xs, state.ys, state.zs};
+
+	std::unique_ptr<uint16_t[]> contigbuf = std::make_unique<uint16_t[]>(xs * ys * zs * nchan);
+
+	for(size_t i = 0; i < nchan; ++i)
+	{
+		error = clSetKernelArg2<cl_mem>(kern.get(), 0, state.output_buffer.get());
+		assert(error == CL_SUCCESS);
+		error = clSetKernelArg2<cl_mem>(kern.get(), 1, state.channel_images[i].get());
+		assert(error == CL_SUCCESS);
+		error = clSetKernelArg2<cl_uint>(kern.get(), 2, static_cast<cl_uint>(i));
+		assert(error == CL_SUCCESS);
+		error = clSetKernelArg2<cl_uint>(kern.get(), 3, static_cast<cl_uint>(nchan));
+		assert(error == CL_SUCCESS);
+
+		error = clEnqueueNDRangeKernel(
+			state.dev_queue.get(),
+			kern.get(),
+			static_cast<cl_uint>(std::extent_v<decltype(global_work_size)>),
+			nullptr,
+			global_work_size,
+			nullptr,
+			1,
+			state.channel_events.data() + i,
+			state.interleave_events.data() + i
+		);
+		assert(error == CL_SUCCESS);
+	}
+
+	error = clEnqueueReadBuffer(
+		state.dev_queue.get(),
+		state.output_buffer.get(),
+		CL_TRUE,
+		0,
+		xs * ys * zs * nchan * sizeof(uint16_t),
+		contigbuf.get(),
+		static_cast<cl_uint>(state.nchan),
+		state.interleave_events.data(),
+		nullptr
+	);
+	assert(error == CL_SUCCESS);
+
+	for(size_t z = 0; z < zs; ++z)
+	{
+		uint16_t *imgstart = contigbuf.get() + (z * (xs * ys * nchan));
+		tiff_write_page_contig(tiff, xs, ys, nchan, page, maxPage, imgstart);
+	}
+}
+

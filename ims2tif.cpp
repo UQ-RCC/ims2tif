@@ -163,6 +163,8 @@ int main(int argc, char **argv)
 		conv = converter_chunk;
 	else if(args.method == conversion_method_t::hyperslab)
 		conv = converter_hyperslab;
+	else if(args.method == conversion_method_t::opencl)
+		conv = converter_opencl;
 	else
 		std::terminate(); /* Will never happen. */
 

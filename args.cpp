@@ -110,6 +110,8 @@ int ims::parse_arguments(int argc, char **argv, FILE *out, FILE *err, args_t *ar
 					args->method = conversion_method_t::chunked;
 				else if(!strcmp(ps.optarg, "hyperslab"))
 					args->method = conversion_method_t::hyperslab;
+				else if(!strcmp(ps.optarg, "opencl"))
+					args->method = conversion_method_t::opencl;
 				else
 					return usage(2, out);
 
