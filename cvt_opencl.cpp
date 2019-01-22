@@ -64,27 +64,23 @@ struct clstate
 };
 
 static const char *kernel =
-"__kernel void interleave(__global unsigned short *contig, __read_only image3d_t chan, unsigned int c, unsigned int nchan)\n"
+"__global unsigned short *get_pixel(__global unsigned short *data, int4 coord, int4 dims)\n"
 "{\n"
-"	size_t x = get_global_id(0);\n"
-"	size_t y = get_global_id(1);\n"
-"	size_t z = get_global_id(2);\n"
-"\n"
-"	int4 dims = get_image_dim(chan);\n"
-"	const size_t pixsize = nchan;\n"
+"	const size_t pixsize = dims.w;\n"
 "	const size_t rowsize = dims.x * pixsize;\n"
 "	const size_t slicesize = dims.y * rowsize;\n"
 "\n"
-"	global unsigned short *slice = contig + (z * slicesize);\n"
-"	global unsigned short *row = slice + (y * rowsize);\n"
-"	global unsigned short *pixel = row + (x * pixsize);\n"
+"	return data + (coord.z * slicesize) + (coord.y * rowsize) + (coord.x * pixsize) + coord.w;\n"
+"}\n"
 "\n"
-"	global unsigned short *out = pixel + c;\n"
+"__kernel void interleave(__global unsigned short *contig, __read_only image3d_t chan, unsigned int c, unsigned int nchan)\n"
+"{\n"
+"	int4 coords = {get_global_id(0), get_global_id(1), get_global_id(2), c};\n"
+"	int4 dims = get_image_dim(chan);\n"
+"	dims.w = nchan;\n"
 
 "	sampler_t sam = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_NONE | CLK_FILTER_NEAREST;\n"
-"	int4 pos = {x, y, z, 0};\n"
-"	unsigned int col = read_imageui(chan, pos).x;\n"
-"	*out = col;"
+"	*get_pixel(contig, coords, dims) = read_imageui(chan, coords).x;"
 "}\n";
 
 template <typename T>
