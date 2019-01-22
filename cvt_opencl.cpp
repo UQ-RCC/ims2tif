@@ -79,8 +79,7 @@ static const char *kernel =
 "	int4 dims = get_image_dim(chan);\n"
 "	dims.w = nchan;\n"
 
-"	sampler_t sam = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_NONE | CLK_FILTER_NEAREST;\n"
-"	*get_pixel(contig, coords, dims) = read_imageui(chan, coords).x;"
+"	*get_pixel(contig, coords, dims) = read_imageui(chan, coords).x;\n"
 "}\n";
 
 template <typename T>
