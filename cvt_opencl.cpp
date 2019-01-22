@@ -55,7 +55,7 @@ struct clstate
 	cl_command_queue_ptr dev_queue;
 
 	constexpr static size_t max_channels = 5;
-	std::array<cl_mem_ptr, max_channels> channel_images;
+	std::array<cl_mem_ptr, max_channels> channel_buffers;
 	std::array<std::unique_ptr<uint16_t[]>, max_channels> host_channel_buffers;
 	std::array<cl_event, max_channels> channel_events;
 
@@ -64,7 +64,7 @@ struct clstate
 };
 
 static const char *kernel =
-"__global unsigned short *get_pixel(__global unsigned short *data, int4 coord, int4 dims)\n"
+"__global unsigned short *get_pixel(__global unsigned short *data, uint4 coord, uint4 dims)\n"
 "{\n"
 "	const size_t pixsize = dims.w;\n"
 "	const size_t rowsize = dims.x * pixsize;\n"
@@ -73,13 +73,16 @@ static const char *kernel =
 "	return data + (coord.z * slicesize) + (coord.y * rowsize) + (coord.x * pixsize) + coord.w;\n"
 "}\n"
 "\n"
-"__kernel void interleave(__global unsigned short *contig, __read_only image3d_t chan, unsigned int c, unsigned int nchan)\n"
+"__kernel void interleave(__global unsigned short *contig, __global unsigned short *chan, unsigned int c, uint4 dims)\n"
 "{\n"
-"	int4 coords = {get_global_id(0), get_global_id(1), get_global_id(2), c};\n"
-"	int4 dims = get_image_dim(chan);\n"
-"	dims.w = nchan;\n"
-
-"	*get_pixel(contig, coords, dims) = read_imageui(chan, coords).x;\n"
+"	uint4 coords = {get_global_id(0), get_global_id(1), get_global_id(2), c};\n"
+""
+"	uint4 ccoords = coords;\n"
+"	ccoords.w = 0;\n"
+"	uint4 cdims = dims;\n"
+"	cdims.w = 1;\n"
+"\n"
+"	*get_pixel(contig, coords, dims) = *get_pixel(chan, ccoords, cdims);\n"
 "}\n";
 
 template <typename T>
@@ -124,16 +127,12 @@ static void fill_images(clstate& s)
 			throw hdf5_exception();
 		cl_int err;
 
-		size_t origin[] = {0, 0, 0};
-		size_t region[] = {s.xs, s.ys, s.zs};
-		err = clEnqueueWriteImage(
+		err = clEnqueueWriteBuffer(
 			s.dev_queue.get(),
-			s.channel_images[c].get(),
+			s.channel_buffers[c].get(),
 			CL_FALSE,
-			origin,
-			region,
-			0 /* s.xs * sizeof(uint16_t) */,
-			0 /* (s.xs * sizeof(uint16_t)) * s.ys */,
+			0,
+			s.xs * s.ys * s.zs * sizeof(uint16_t),
 			s.host_channel_buffers[c].get(),
 			0,
 			nullptr,
@@ -192,26 +191,6 @@ void ims::converter_opencl(TIFF *tiff, hid_t timepoint, size_t xs, size_t ys, si
 
 	assert(error == CL_SUCCESS);
 
-	cl_image_format chanfmt;
-	chanfmt.image_channel_order = CL_R;
-	chanfmt.image_channel_data_type = CL_UNSIGNED_INT16;
-
-	cl_image_desc chandesc;
-	chandesc.image_type = CL_MEM_OBJECT_IMAGE3D;
-	chandesc.image_width = xs;
-	chandesc.image_height = ys;
-	chandesc.image_depth = zs;
-	chandesc.image_array_size = 1;
-	chandesc.image_row_pitch = 0;
-	chandesc.image_slice_pitch = 0;
-	chandesc.num_mip_levels = 0;
-	chandesc.num_samples = 0;
-#ifdef USE_OPENCL_1_2
-	chandesc.buffer = nullptr;
-#else
-	chandesc.mem_object = nullptr;
-#endif
-
 	if(nchan > clstate::max_channels)
 		std::terminate();
 
@@ -219,15 +198,14 @@ void ims::converter_opencl(TIFF *tiff, hid_t timepoint, size_t xs, size_t ys, si
 	for(size_t i = 0; i < nchan; ++i)
 	{
 		state.host_channel_buffers[i] = std::make_unique<uint16_t[]>(xs * ys * zs);
-		state.channel_images[i].reset(clCreateImage(
+		state.channel_buffers[i].reset(clCreateBuffer(
 			state.ctx.get(),
 			CL_MEM_READ_ONLY | CL_MEM_HOST_WRITE_ONLY,
-			&chanfmt,
-			&chandesc,
+			xs * ys * zs * sizeof(uint16_t),
 			nullptr,
 			&error
 		));
-		assert(state.channel_images[i]);
+		assert(state.channel_buffers[i]);
 		assert(error == CL_SUCCESS);
 	}
 
@@ -253,15 +231,17 @@ void ims::converter_opencl(TIFF *tiff, hid_t timepoint, size_t xs, size_t ys, si
 
 	std::unique_ptr<uint16_t[]> contigbuf = std::make_unique<uint16_t[]>(xs * ys * zs * nchan);
 
+	cl_uint4 dims = {(cl_uint)xs, (cl_uint)ys, (cl_uint)zs, (cl_uint)nchan};
+
 	for(size_t i = 0; i < nchan; ++i)
 	{
 		error = clSetKernelArg2<cl_mem>(kern.get(), 0, state.output_buffer.get());
 		assert(error == CL_SUCCESS);
-		error = clSetKernelArg2<cl_mem>(kern.get(), 1, state.channel_images[i].get());
+		error = clSetKernelArg2<cl_mem>(kern.get(), 1, state.channel_buffers[i].get());
 		assert(error == CL_SUCCESS);
 		error = clSetKernelArg2<cl_uint>(kern.get(), 2, static_cast<cl_uint>(i));
 		assert(error == CL_SUCCESS);
-		error = clSetKernelArg2<cl_uint>(kern.get(), 3, static_cast<cl_uint>(nchan));
+		error = clSetKernelArg2<cl_uint4>(kern.get(), 3, dims);
 		assert(error == CL_SUCCESS);
 
 		error = clEnqueueNDRangeKernel(
