@@ -195,7 +195,7 @@ int main(int argc, char **argv)
 		if(!tp)
 			return 1;
 
-		conv(tif.get(), tp.get(), imsinfo.x, imsinfo.y, imsinfo.z, imsinfo.c, i + 1);
+		conv(tif.get(), tp.get(), imsinfo.x, imsinfo.y, imsinfo.z, imsinfo.c);
 	}
 
 	return 0;

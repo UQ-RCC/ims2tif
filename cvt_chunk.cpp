@@ -68,7 +68,7 @@ static int get_chunk_size(hid_t tp, size_t nchan, hsize_t& xs, hsize_t& ys, hsiz
 	return 0;
 }
 
-void ims::converter_chunk(TIFF *tiff, hid_t timepoint, size_t xs, size_t ys, size_t zs, size_t nchan, size_t page)
+void ims::converter_chunk(TIFF *tiff, hid_t timepoint, size_t xs, size_t ys, size_t zs, size_t nchan)
 {
 	hsize_t xcs, ycs, zcs;
 	if(get_chunk_size(timepoint, nchan, xcs, ycs, zcs) < 0)
@@ -135,7 +135,7 @@ void ims::converter_chunk(TIFF *tiff, hid_t timepoint, size_t xs, size_t ys, siz
 		for(size_t i = 0; i < zcs && npages < zs; ++i, ++npages)
 		{
 			uint16_t *imgstart = buffer.get() + (i * (xs * ys * nchan));
-			tiff_write_page_contig(tiff, xs, ys, nchan, page, zs, imgstart);
+			tiff_write_page_contig(tiff, xs, ys, nchan, npages, zs, imgstart);
 		}
 	}
 }
