@@ -51,4 +51,4 @@ COPY	build.sh /
 
 # Run like docker run --rm -it -v$PWD:/tmp/ims2tif-build --user=1000 ims2tif-build
 # The output will be in $PWD/ims2tif
-ENTRYPOINT	/build.sh
+ENTRYPOINT	["/build.sh"]
